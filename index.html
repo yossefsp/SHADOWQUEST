@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ShadowQuest - Kaboom Demo (20 levels)</title>
+<style> html,body{height:100%;margin:0;background:#071022;color:#fff;font-family:sans-serif} #game{width:100%;height:100vh;display:block}</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script src="https://unpkg.com/kaboom@2000.0.0/dist/kaboom.js"></script>
+<script>
+// Kaboom setup
+kaboom({
+  global: true,
+  fullscreen: false,
+  width: 1000,
+  height: 650,
+  canvas: document.getElementById("game"),
+  scale: 1,
+  clearColor: [0,0.05,0.06,1],
+});
+
+// load assets
+loadSprite("hero", "assets/hero.png");
+loadSprite("enemy", "assets/enemy.png");
+loadSprite("boss", "assets/boss.png");
+loadSprite("bg", "assets/bg_forest.png");
+loadSprite("pistol", "assets/pistol.png");
+loadSprite("knife", "assets/knife.png");
+loadSprite("bomb", "assets/bomb.png");
+
+scene("game", (level)=>{
+  layers(["bg","obj","ui"], "obj");
+  add([sprite("bg"), layer("bg"), pos(0,0), scale(1), origin("topleft")]);
+  const MAP_W = 5200;
+  const MAP_H = 2600;
+
+  // create player
+  const player = add([
+    sprite("hero"),
+    pos(160, 500),
+    area(),
+    body(),
+    origin("center"),
+    scale(0.9),
+    "player"
+  ]);
+
+  player.hp = 100;
+  player.coins = 0;
+  player.currentWeapon = "pistol";
+
+  // controls
+  keyDown("a", ()=>{ player.move(-200,0); });
+  keyDown("d", ()=>{ player.move(200,0); });
+  keyPress("space", ()=>{ if (player.isGrounded()) player.jump(520); });
+  mouseClick(()=>{ shoot(mousePos()); });
+
+  function shoot(target){
+    // simple projectile
+    const b = add([
+      pos(player.pos.x, player.pos.y - 10),
+      circle(6),
+      color(1,1,0),
+      "bullet",
+      { dir: vec2(target).sub(player.pos).unit(), life: 2 }
+    ]);
+    b.onUpdate(()=>{ b.move(b.dir.scale(900).scale(dt())); b.life -= dt(); if (b.life <= 0) destroy(b); });
+  }
+
+  // simple platforms (use rectangles)
+  for(let i=0;i<40;i++){
+    const x = 100 + i*130;
+    const y = 520 - ((i%7)*30);
+    add([rect(180, 18), pos(x, y), area(), color(6/255,90/255,94/255), solid(), "platform"]);
+  }
+
+  // enemies per level scaling
+  const enemyCount = Math.min(5 + level*2, 60);
+  for(let i=0;i<enemyCount;i++){
+    const ex = 300 + Math.random()*800 + i*30;
+    const ey = 420 - (Math.random()*200);
+    const e = add([sprite("enemy"), pos(ex, ey), area(), body(), origin("center"), "enemy"]);
+    e.hp = 20 + Math.floor(level*4);
+    e.onCollide("player", ()=>{ player.hp -= 10; });
+    e.onUpdate(()=>{ e.moveTo(e.pos.x + Math.sin(time()/1000 + i)*20, e.pos.y); });
+  }
+
+  // boss on level 20
+  if(level === 20){
+    const b = add([sprite("boss"), pos(4500, 420), area(), origin("center"), "boss"]);
+    b.hp = 800;
+    // boss attacks
+    loop(1.2, ()=>{ if (!b.exists()) return; let p = add([pos(b.pos.x, b.pos.y-40), rect(10,10), color(1,0.4,0), move(LEFT, 200), "bossbullet"]); wait(3, ()=>destroy(p)); });
+    b.onUpdate(()=>{ // simple follow
+      b.moveTo(b.pos.x + (player.pos.x - b.pos.x)*0.01, b.pos.y); 
+    });
+    collides("bullet","boss", (bb, bs)=>{ bs.hp -= 30; destroy(bb); if (bs.hp <= 0) { destroy(bs); go("win"); } });
+  }
+
+  // collisions
+  collides("bullet","enemy", (b,e)=>{ e.hp -= 28; destroy(b); if (e.hp <= 0) destroy(e); });
+
+  // camera follow
+  player.onUpdate(()=>{ camPos(player.pos); });
+
+  // HUD
+  const hpLabel = add([text("HP: " + player.hp, 16), pos(12,12), layer("ui")]);
+  player.onUpdate(()=>{ hpLabel.text = "HP: " + Math.max(0, Math.floor(player.hp)); if (player.hp <= 0) go("lose"); });
+
+  // win/lose detection
+  action("enemy", (e)=>{ if (e.pos.y > height()+200) destroy(e); });
+
+});
+
+// win/lose scenes
+scene("win", ()=>{ add([text("You defeated the forest lord! (Level 20)", 24), pos(center())]); });
+scene("lose", ()=>{ add([text("You died. Retry.", 24), pos(center())]); });
+
+// start at level 1 and allow level jump with number keys (1-9 for test)
+let currentLevel = 1;
+function startLevel(l){
+  go("game", l);
+}
+startLevel(currentLevel);
+
+// quick level advance for testing
+keyPress("q", ()=>{ currentLevel = Math.min(20, currentLevel+1); startLevel(currentLevel); });
+keyPress("e", ()=>{ currentLevel = Math.max(1, currentLevel-1); startLevel(currentLevel); });
+
+</script>
+</body>
+</html>
