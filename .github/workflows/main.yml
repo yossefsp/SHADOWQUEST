@@ -1,9 +1,10 @@
-name: Build Windows EXE
+name: Build Windows 7 Compatible EXE
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,18 +19,16 @@ jobs:
         with:
           node-version: 16
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install Electron 13 (Windows 7 compatible)
+        run: |
+          npm install electron@13
+          npm install electron-builder --save-dev
 
-      - name: Install Electron Builder
-        run: npm install electron-builder --save-dev
-
-      - name: Build EXE
+      - name: Build Windows 7 compatible EXE (32-bit)
         run: npx electron-builder --win --ia32 --publish never
-
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: game-exe
+          name: game-exe-win7
           path: dist/*.exe
